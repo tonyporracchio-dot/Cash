@@ -96,15 +96,25 @@ canvas {
 <script>
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g2SKnIxq4UnXCWVJjl-wer-CDciNP3xXHTFCdX_FIumP5NA2I8XpWqRXL2gHoMKTq/pub?gid=2116695106&single=true&output=csv";
 
-    async function loadData() {
+function parseNumber(val) {
+    if (!val) return 0;
+    return parseFloat(
+        val.replace(/\./g, "")   // rimuove separatori migliaia
+           .replace(",", ".")    // converte decimali
+    ) || 0;
+}
+
+async function loadData() {
     document.getElementById("loader").style.display = "flex";
 
     const res = await fetch(CSV_URL);
     const text = await res.text();
 
-    const rows = text.split("\n").map(r => r.split(","));
+    const rows = text
+        .trim()
+        .split("\n")
+        .map(r => r.split(";"));
 
-    const headers = rows[0];
     const data = rows.slice(1);
 
     const mesi = [];
@@ -117,11 +127,16 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g
         if (!r[0]) return;
 
         mesi.push(r[0]);
-        entrate.push(Number(r[1]));
-        uscite.push(Number(r[2]));
-        liquidita.push(Number(r[3]));
-        titoli.push(Number(r[4]));
+        entrate.push(parseNumber(r[1]));
+        uscite.push(parseNumber(r[2]));
+        liquidita.push(parseNumber(r[3]));
+        titoli.push(parseNumber(r[4]));
     });
+
+    if (mesi.length === 0) {
+        alert("Errore: nessun dato trovato nel CSV");
+        return;
+    }
 
     const last = mesi.length - 1;
 
@@ -136,7 +151,10 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g
 }
 
 function format(n) {
-    return n.toLocaleString("it-IT", {style: "currency", currency: "EUR"});
+    return n.toLocaleString("it-IT", {
+        style: "currency",
+        currency: "EUR"
+    });
 }
 
 function drawCharts(mesi, entrate, uscite, liquidita, titoli) {
@@ -193,4 +211,3 @@ window.addEventListener("touchend", e => {
 
 </body>
 </html>
-
