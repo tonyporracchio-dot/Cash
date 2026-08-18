@@ -96,7 +96,7 @@ canvas {
 <script>
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g2SKnIxq4UnXCWVJjl-wer-CDciNP3xXHTFCdX_FIumP5NA2I8XpWqRXL2gHoMKTq/pub?gid=2116695106&single=true&output=csv";
 
-async function loadData() {
+    async function loadData() {
     document.getElementById("loader").style.display = "flex";
 
     const res = await fetch(CSV_URL);
