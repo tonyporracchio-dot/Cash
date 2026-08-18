@@ -1,1 +1,196 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Liquidità</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body {
+    font-family: Arial;
+    margin: 0;
+    background: #0f172a;
+    color: white;
+}
+
+.container {
+    padding: 15px;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.card {
+    background: #1e293b;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.card h3 {
+    margin: 0;
+    font-size: 14px;
+    color: #94a3b8;
+}
+
+.card p {
+    font-size: 20px;
+    margin: 5px 0 0;
+}
+
+canvas {
+    background: #1e293b;
+    border-radius: 10px;
+    margin-bottom: 20px;
+}
+
+.loader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #0f172a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="loader" id="loader">Caricamento...</div>
+
+<div class="container">
+    <div class="cards">
+        <div class="card">
+            <h3>Liquidità</h3>
+            <p id="liquidita"></p>
+        </div>
+        <div class="card">
+            <h3>Entrate</h3>
+            <p id="entrate"></p>
+        </div>
+        <div class="card">
+            <h3>Uscite</h3>
+            <p id="uscite"></p>
+        </div>
+        <div class="card">
+            <h3>Patrimonio</h3>
+            <p id="patrimonio"></p>
+        </div>
+    </div>
+
+    <canvas id="liquiditaChart"></canvas>
+    <canvas id="entrateUsciteChart"></canvas>
+    <canvas id="patrimonioChart"></canvas>
+</div>
+
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g2SKnIxq4UnXCWVJjl-wer-CDciNP3xXHTFCdX_FIumP5NA2I8XpWqRXL2gHoMKTq/pub?gid=2116695106&single=true&output=csv";
+
+async function loadData() {
+    document.getElementById("loader").style.display = "flex";
+
+    const res = await fetch(CSV_URL);
+    const text = await res.text();
+
+    const rows = text.split("\n").map(r => r.split(","));
+
+    const headers = rows[0];
+    const data = rows.slice(1);
+
+    const mesi = [];
+    const entrate = [];
+    const uscite = [];
+    const liquidita = [];
+    const titoli = [];
+
+    data.forEach(r => {
+        if (!r[0]) return;
+
+        mesi.push(r[0]);
+        entrate.push(Number(r[1]));
+        uscite.push(Number(r[2]));
+        liquidita.push(Number(r[3]));
+        titoli.push(Number(r[4]));
+    });
+
+    const last = mesi.length - 1;
+
+    document.getElementById("liquidita").innerText = format(liquidita[last]);
+    document.getElementById("entrate").innerText = format(entrate[last]);
+    document.getElementById("uscite").innerText = format(uscite[last]);
+    document.getElementById("patrimonio").innerText = format(liquidita[last] + titoli[last]);
+
+    drawCharts(mesi, entrate, uscite, liquidita, titoli);
+
+    document.getElementById("loader").style.display = "none";
+}
+
+function format(n) {
+    return n.toLocaleString("it-IT", {style: "currency", currency: "EUR"});
+}
+
+function drawCharts(mesi, entrate, uscite, liquidita, titoli) {
+
+    new Chart(document.getElementById("liquiditaChart"), {
+        type: "line",
+        data: {
+            labels: mesi,
+            datasets: [{
+                label: "Liquidità",
+                data: liquidita
+            }]
+        }
+    });
+
+    new Chart(document.getElementById("entrateUsciteChart"), {
+        type: "bar",
+        data: {
+            labels: mesi,
+            datasets: [
+                { label: "Entrate", data: entrate },
+                { label: "Uscite", data: uscite }
+            ]
+        }
+    });
+
+    new Chart(document.getElementById("patrimonioChart"), {
+        type: "line",
+        data: {
+            labels: mesi,
+            datasets: [
+                { label: "Liquidità", data: liquidita },
+                { label: "Titoli", data: titoli }
+            ]
+        }
+    });
+}
+
+loadData();
+
+// Pull to refresh
+let startY = 0;
+
+window.addEventListener("touchstart", e => {
+    startY = e.touches[0].clientY;
+});
+
+window.addEventListener("touchend", e => {
+    if (e.changedTouches[0].clientY - startY > 100) {
+        loadData();
+    }
+});
+</script>
+
+</body>
+</html>
 
