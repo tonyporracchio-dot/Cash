@@ -51,10 +51,7 @@ canvas {
 
 .loader {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    inset: 0;
     background: #0f172a;
     display: flex;
     justify-content: center;
@@ -86,6 +83,10 @@ canvas {
             <h3>Patrimonio</h3>
             <p id="patrimonio"></p>
         </div>
+        <div class="card">
+            <h3>Crescita media</h3>
+            <p id="crescita"></p>
+        </div>
     </div>
 
     <canvas id="liquiditaChart"></canvas>
@@ -96,12 +97,41 @@ canvas {
 <script>
 const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g2SKnIxq4UnXCWVJjl-wer-CDciNP3xXHTFCdX_FIumP5NA2I8XpWqRXL2gHoMKTq/pub?gid=2116695106&single=true&output=csv";
 
+const mesiMap = {
+    gennaio: 0, febbraio: 1, marzo: 2, aprile: 3,
+    maggio: 4, giugno: 5, luglio: 6, agosto: 7,
+    settembre: 8, ottobre: 9, novembre: 10, dicembre: 11
+};
+
 function parseNumber(val) {
     if (!val) return 0;
     return parseFloat(
-        val.replace(/\./g, "")   // rimuove separatori migliaia
-           .replace(",", ".")    // converte decimali
+        val.replace(/€/g, "")
+           .replace(/\s/g, "")
+           .replace(/\./g, "")
+           .replace(",", ".")
     ) || 0;
+}
+
+function parseMese(str) {
+    if (!str) return null;
+    const parts = str.toLowerCase().split(" ");
+    const mese = mesiMap[parts[0]];
+    const anno = parseInt(parts[1]);
+    return new Date(anno, mese, 1);
+}
+
+function isFuture(date) {
+    const now = new Date();
+    return date > new Date(now.getFullYear(), now.getMonth(), 1);
+}
+
+function crescitaMedia(liquidita) {
+    let variazioni = [];
+    for (let i = 1; i < liquidita.length; i++) {
+        variazioni.push(liquidita[i] - liquidita[i-1]);
+    }
+    return variazioni.reduce((a,b) => a+b, 0) / variazioni.length;
 }
 
 async function loadData() {
@@ -110,11 +140,7 @@ async function loadData() {
     const res = await fetch(CSV_URL);
     const text = await res.text();
 
-    const rows = text
-        .trim()
-        .split("\n")
-        .map(r => r.split(";"));
-
+    const rows = text.trim().split("\n").map(r => r.split(";"));
     const data = rows.slice(1);
 
     const mesi = [];
@@ -122,21 +148,20 @@ async function loadData() {
     const uscite = [];
     const liquidita = [];
     const titoli = [];
+    const isPrev = [];
 
     data.forEach(r => {
         if (!r[0]) return;
+
+        const dataMese = parseMese(r[0]);
 
         mesi.push(r[0]);
         entrate.push(parseNumber(r[1]));
         uscite.push(parseNumber(r[2]));
         liquidita.push(parseNumber(r[3]));
         titoli.push(parseNumber(r[4]));
+        isPrev.push(isFuture(dataMese));
     });
-
-    if (mesi.length === 0) {
-        alert("Errore: nessun dato trovato nel CSV");
-        return;
-    }
 
     const last = mesi.length - 1;
 
@@ -145,7 +170,10 @@ async function loadData() {
     document.getElementById("uscite").innerText = format(uscite[last]);
     document.getElementById("patrimonio").innerText = format(liquidita[last] + titoli[last]);
 
-    drawCharts(mesi, entrate, uscite, liquidita, titoli);
+    const crescita = crescitaMedia(liquidita);
+    document.getElementById("crescita").innerText = format(crescita);
+
+    drawCharts(mesi, entrate, uscite, liquidita, titoli, isPrev);
 
     document.getElementById("loader").style.display = "none";
 }
@@ -157,16 +185,29 @@ function format(n) {
     });
 }
 
-function drawCharts(mesi, entrate, uscite, liquidita, titoli) {
+function drawCharts(mesi, entrate, uscite, liquidita, titoli, isPrev) {
+
+    const storico = [];
+    const previsione = [];
+
+    for (let i = 0; i < liquidita.length; i++) {
+        if (isPrev[i]) {
+            storico.push(null);
+            previsione.push(liquidita[i]);
+        } else {
+            storico.push(liquidita[i]);
+            previsione.push(null);
+        }
+    }
 
     new Chart(document.getElementById("liquiditaChart"), {
         type: "line",
         data: {
             labels: mesi,
-            datasets: [{
-                label: "Liquidità",
-                data: liquidita
-            }]
+            datasets: [
+                { label: "Storico", data: storico },
+                { label: "Previsione", data: previsione, borderDash: [6,6] }
+            ]
         }
     });
 
@@ -195,17 +236,11 @@ function drawCharts(mesi, entrate, uscite, liquidita, titoli) {
 
 loadData();
 
-// Pull to refresh
+// pull to refresh
 let startY = 0;
-
-window.addEventListener("touchstart", e => {
-    startY = e.touches[0].clientY;
-});
-
+window.addEventListener("touchstart", e => startY = e.touches[0].clientY);
 window.addEventListener("touchend", e => {
-    if (e.changedTouches[0].clientY - startY > 100) {
-        loadData();
-    }
+    if (e.changedTouches[0].clientY - startY > 100) loadData();
 });
 </script>
 
