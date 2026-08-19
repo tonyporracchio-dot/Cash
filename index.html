@@ -8,56 +8,14 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-body {
-    font-family: Arial;
-    margin: 0;
-    background: #0f172a;
-    color: white;
-}
-
-.container {
-    padding: 15px;
-}
-
-.cards {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-bottom: 20px;
-}
-
-.card {
-    background: #1e293b;
-    padding: 15px;
-    border-radius: 10px;
-}
-
-.card h3 {
-    margin: 0;
-    font-size: 14px;
-    color: #94a3b8;
-}
-
-.card p {
-    font-size: 20px;
-    margin: 5px 0 0;
-}
-
-canvas {
-    background: #1e293b;
-    border-radius: 10px;
-    margin-bottom: 20px;
-}
-
-.loader {
-    position: fixed;
-    inset: 0;
-    background: #0f172a;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 20px;
-}
+body { font-family: Arial; margin: 0; background: #0f172a; color: white; }
+.container { padding: 15px; }
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+.card { background: #1e293b; padding: 15px; border-radius: 10px; }
+.card h3 { margin: 0; font-size: 14px; color: #94a3b8; }
+.card p { font-size: 20px; margin: 5px 0 0; }
+canvas { background: #1e293b; border-radius: 10px; margin-bottom: 20px; }
+.loader { position: fixed; inset: 0; background: #0f172a; display: flex; justify-content: center; align-items: center; }
 </style>
 </head>
 
@@ -67,131 +25,108 @@ canvas {
 
 <div class="container">
     <div class="cards">
-        <div class="card">
-            <h3>Liquidità</h3>
-            <p id="liquidita"></p>
-        </div>
-        <div class="card">
-            <h3>Entrate</h3>
-            <p id="entrate"></p>
-        </div>
-        <div class="card">
-            <h3>Uscite</h3>
-            <p id="uscite"></p>
-        </div>
-        <div class="card">
-            <h3>Patrimonio</h3>
-            <p id="patrimonio"></p>
-        </div>
-        <div class="card">
-            <h3>Crescita media</h3>
-            <p id="crescita"></p>
-        </div>
+        <div class="card"><h3>Liquidità</h3><p id="liquidita"></p></div>
+        <div class="card"><h3>Entrate</h3><p id="entrate"></p></div>
+        <div class="card"><h3>Uscite</h3><p id="uscite"></p></div>
+        <div class="card"><h3>Patrimonio</h3><p id="patrimonio"></p></div>
+        <div class="card"><h3>Crescita media</h3><p id="crescita"></p></div>
     </div>
 
     <canvas id="liquiditaChart"></canvas>
     <canvas id="entrateUsciteChart"></canvas>
-    <canvas id="patrimonioChart"></canvas>
 </div>
 
 <script>
-const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g2SKnIxq4UnXCWVJjl-wer-CDciNP3xXHTFCdX_FIumP5NA2I8XpWqRXL2gHoMKTq/pub?gid=2116695106&single=true&output=csv";
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g2SKnIxq4UnXCWVJjl-wer-CDciNP3xXHTFCdX_FIumP5NA2I8XpWqRXL2gHoMKTq/pub?gid=2116695106&output=csv";
 
 const mesiMap = {
-    gennaio: 0, febbraio: 1, marzo: 2, aprile: 3,
-    maggio: 4, giugno: 5, luglio: 6, agosto: 7,
-    settembre: 8, ottobre: 9, novembre: 10, dicembre: 11
+    gennaio:0,febbraio:1,marzo:2,aprile:3,maggio:4,giugno:5,
+    luglio:6,agosto:7,settembre:8,ottobre:9,novembre:10,dicembre:11
 };
 
-function parseNumber(val) {
-    if (!val) return 0;
+function parseNumber(val){
+    if(!val) return 0;
     return parseFloat(
-        val.replace(/€/g, "")
-           .replace(/\s/g, "")
-           .replace(/\./g, "")
-           .replace(",", ".")
+        val.replace(/€/g,"")
+           .replace(/\s/g,"")
+           .replace(/\./g,"")
+           .replace(",",".")
     ) || 0;
 }
 
-function parseMese(str) {
-    if (!str) return null;
-    const parts = str.toLowerCase().split(" ");
-    const mese = mesiMap[parts[0]];
-    const anno = parseInt(parts[1]);
-    return new Date(anno, mese, 1);
+function parseMese(str){
+    const [m,a]=str.toLowerCase().split(" ");
+    return new Date(parseInt(a), mesiMap[m],1);
 }
 
-function isFuture(date) {
-    const now = new Date();
-    return date > new Date(now.getFullYear(), now.getMonth(), 1);
+function isFuture(d){
+    const now=new Date();
+    return d>new Date(now.getFullYear(),now.getMonth(),1);
 }
 
-function crescitaMedia(liquidita) {
-    let variazioni = [];
-    for (let i = 1; i < liquidita.length; i++) {
-        variazioni.push(liquidita[i] - liquidita[i-1]);
-    }
-    return variazioni.reduce((a,b) => a+b, 0) / variazioni.length;
+function crescitaMedia(arr){
+    let v=[];
+    for(let i=1;i<arr.length;i++) v.push(arr[i]-arr[i-1]);
+    return v.reduce((a,b)=>a+b,0)/v.length;
 }
 
-async function loadData() {
-    document.getElementById("loader").style.display = "flex";
+async function loadData(){
+    document.getElementById("loader").style.display="flex";
 
-    const res = await fetch(CSV_URL);
-    const text = await res.text();
+    const text=await (await fetch(CSV_URL)).text();
 
-    const rows = text.trim().split("\n").map(r => r.split(";"));
-    const data = rows.slice(1);
+    // autodetect separatore
+    const sep = text.includes(";") ? ";" : ",";
 
-    const mesi = [];
-    const entrate = [];
-    const uscite = [];
-    const liquidita = [];
-    const titoli = [];
-    const isPrev = [];
+    const rows=text.trim().split("\n").map(r=>r.split(sep));
 
-    data.forEach(r => {
-        if (!r[0]) return;
+    const headers=rows[0].map(h=>h.trim().toLowerCase());
 
-        const dataMese = parseMese(r[0]);
+    const idx = {
+        mese: headers.indexOf("mese"),
+        entrate: headers.indexOf("totale entrate"),
+        uscite: headers.indexOf("totale uscite"),
+        liquidita: headers.indexOf("totale liquidità"),
+        titoli: headers.indexOf("titoli")
+    };
 
-        mesi.push(r[0]);
-        entrate.push(parseNumber(r[1]));
-        uscite.push(parseNumber(r[2]));
-        liquidita.push(parseNumber(r[3]));
-        titoli.push(parseNumber(r[4]));
-        isPrev.push(isFuture(dataMese));
+    const mesi=[], entrate=[], uscite=[], liquidita=[], titoli=[], prev=[];
+
+    rows.slice(1).forEach(r=>{
+        if(!r[idx.mese]) return;
+
+        mesi.push(r[idx.mese]);
+        entrate.push(parseNumber(r[idx.entrate]));
+        uscite.push(parseNumber(r[idx.uscite]));
+        liquidita.push(parseNumber(r[idx.liquidita]));
+        titoli.push(parseNumber(r[idx.titoli]));
+
+        prev.push(isFuture(parseMese(r[idx.mese])));
     });
 
-    const last = mesi.length - 1;
+    const last=mesi.length-1;
 
-    document.getElementById("liquidita").innerText = format(liquidita[last]);
-    document.getElementById("entrate").innerText = format(entrate[last]);
-    document.getElementById("uscite").innerText = format(uscite[last]);
-    document.getElementById("patrimonio").innerText = format(liquidita[last] + titoli[last]);
+    document.getElementById("liquidita").innerText=format(liquidita[last]);
+    document.getElementById("entrate").innerText=format(entrate[last]);
+    document.getElementById("uscite").innerText=format(uscite[last]);
+    document.getElementById("patrimonio").innerText=format(liquidita[last]+titoli[last]);
+    document.getElementById("crescita").innerText=format(crescitaMedia(liquidita));
 
-    const crescita = crescitaMedia(liquidita);
-    document.getElementById("crescita").innerText = format(crescita);
+    drawCharts(mesi, entrate, uscite, liquidita, prev);
 
-    drawCharts(mesi, entrate, uscite, liquidita, titoli, isPrev);
-
-    document.getElementById("loader").style.display = "none";
+    document.getElementById("loader").style.display="none";
 }
 
-function format(n) {
-    return n.toLocaleString("it-IT", {
-        style: "currency",
-        currency: "EUR"
-    });
+function format(n){
+    return n.toLocaleString("it-IT",{style:"currency",currency:"EUR"});
 }
 
-function drawCharts(mesi, entrate, uscite, liquidita, titoli, isPrev) {
+function drawCharts(mesi, entrate, uscite, liquidita, prev){
 
-    const storico = [];
-    const previsione = [];
+    const storico=[], previsione=[];
 
-    for (let i = 0; i < liquidita.length; i++) {
-        if (isPrev[i]) {
+    for(let i=0;i<liquidita.length;i++){
+        if(prev[i]){
             storico.push(null);
             previsione.push(liquidita[i]);
         } else {
@@ -200,48 +135,30 @@ function drawCharts(mesi, entrate, uscite, liquidita, titoli, isPrev) {
         }
     }
 
-    new Chart(document.getElementById("liquiditaChart"), {
-        type: "line",
-        data: {
-            labels: mesi,
-            datasets: [
-                { label: "Storico", data: storico },
-                { label: "Previsione", data: previsione, borderDash: [6,6] }
+    new Chart(document.getElementById("liquiditaChart"),{
+        type:"line",
+        data:{
+            labels:mesi,
+            datasets:[
+                {label:"Storico",data:storico},
+                {label:"Previsione",data:previsione,borderDash:[6,6]}
             ]
         }
     });
 
-    new Chart(document.getElementById("entrateUsciteChart"), {
-        type: "bar",
-        data: {
-            labels: mesi,
-            datasets: [
-                { label: "Entrate", data: entrate },
-                { label: "Uscite", data: uscite }
-            ]
-        }
-    });
-
-    new Chart(document.getElementById("patrimonioChart"), {
-        type: "line",
-        data: {
-            labels: mesi,
-            datasets: [
-                { label: "Liquidità", data: liquidita },
-                { label: "Titoli", data: titoli }
+    new Chart(document.getElementById("entrateUsciteChart"),{
+        type:"bar",
+        data:{
+            labels:mesi,
+            datasets:[
+                {label:"Entrate",data:entrate},
+                {label:"Uscite",data:uscite}
             ]
         }
     });
 }
 
 loadData();
-
-// pull to refresh
-let startY = 0;
-window.addEventListener("touchstart", e => startY = e.touches[0].clientY);
-window.addEventListener("touchend", e => {
-    if (e.changedTouches[0].clientY - startY > 100) loadData();
-});
 </script>
 
 </body>
