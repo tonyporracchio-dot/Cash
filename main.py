@@ -183,7 +183,7 @@ async def fetch_cash_data(*, force: bool = False) -> dict[str, Any]:
 
 @app.get("/")
 async def get_dashboard():
-    with open("dashboard.html", "r", encoding="utf-8") as f:
+    with open("index.html", "r", encoding="utf-8") as f:
         return HTMLResponse(content=f.read())
 
 
