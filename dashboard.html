@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cash Dashboard</title>
+<style>
+.viz-root {
+  color-scheme: light;
+  --surface-1:      #fcfcfb;
+  --page-plane:     #f9f9f7;
+  --text-primary:   #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted:     #898781;
+  --gridline:       #e1e0d9;
+  --baseline:       #c3c2b7;
+  --border:         rgba(11,11,11,0.10);
+  --delta-up:       #006300;
+  --delta-down:     #d03b3b;
+  --series-1:       #2a78d6;
+  --series-2:       #eb6834;
+  --series-3:       #1baf7a;
+  --series-4:       #eda100;
+  --status-good:    #0ca30c;
+  --status-crit:    #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline:       #383835;
+    --border:         rgba(255,255,255,0.10);
+    --delta-up:       #0ca30c;
+    --delta-down:     #e66767;
+    --series-1:       #3987e5;
+    --series-2:       #d95926;
+    --series-3:       #199e70;
+    --series-4:       #c98500;
+  }
+}
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --surface-1:      #1a1a19;
+  --page-plane:     #0d0d0d;
+  --text-primary:   #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted:     #898781;
+  --gridline:       #2c2c2a;
+  --baseline:       #383835;
+  --border:         rgba(255,255,255,0.10);
+  --delta-up:       #0ca30c;
+  --delta-down:     #e66767;
+  --series-1:       #3987e5;
+  --series-2:       #d95926;
+  --series-3:       #199e70;
+  --series-4:       #c98500;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-family: "Segoe UI", system-ui, sans-serif; }
+body {
+  background: var(--page-plane);
+  color: var(--text-primary);
+  min-height: 100vh;
+}
+
+.dashboard {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+}
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.dashboard-title {
+  font-size: 24px;
+  font-weight: 600;
+}
+.dashboard-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 24px;
+}
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.btn:hover { background: var(--border); }
+.btn:disabled { opacity: 0.5; cursor: wait; }
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--status-crit);
+  display: inline-block;
+}
+.status-dot.ok { background: var(--status-good); }
+.status-label {
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.section-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.stat-tile {
+  background: var(--surface-1);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.stat-tile.forecast {
+  border-style: dashed;
+}
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.stat-value {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value.up { color: var(--delta-up); }
+.stat-value.down { color: var(--delta-down); }
+.stat-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.chart-card {
+  background: var(--surface-1);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  padding: 20px;
+}
+.chart-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.chart-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.chart-canvas-wrap {
+  position: relative;
+  width: 100%;
+}
+.chart-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 300px;
+}
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.legend-swatch {
+  width: 12px;
+  height: 3px;
+  border-radius: 1px;
+}
+.legend-swatch.dashed {
+  background: repeating-linear-gradient(
+    90deg,
+    currentColor 0 4px,
+    transparent 4px 7px
+  );
+  height: 2px;
+  color: var(--text-muted);
+}
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 13px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+}
+.chart-tooltip.visible { opacity: 1; }
+.tooltip-time {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.tooltip-key {
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+.tooltip-value { font-weight: 600; }
+.tooltip-label { color: var(--text-secondary); }
+
+.table-toggle {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px 0 0;
+}
+.table-toggle:hover { color: var(--text-secondary); }
+.data-table {
+  display: none;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  margin-top: 12px;
+}
+.data-table.visible { display: table; }
+.data-table th, .data-table td {
+  text-align: right;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--gridline);
+}
+.data-table th {
+  font-weight: 500;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.data-table th:first-child,
+.data-table td:first-child,
+.data-table th:nth-child(2),
+.data-table td:nth-child(2) { text-align: left; }
+.data-table tr.forecast td { color: var(--text-secondary); font-style: italic; }
+
+.error-banner {
+  display: none;
+  background: rgba(208, 59, 59, 0.1);
+  color: var(--delta-down);
+  border: 1px solid var(--delta-down);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.error-banner.visible { display: block; }
+
+@media (max-width: 768px) {
+  .stat-value { font-size: 22px; }
+  .chart-canvas-wrap canvas { height: 240px; }
+}
+</style>
+</head>
+<body class="viz-root">
+<div class="dashboard">
+  <div class="dashboard-header">
+    <h1 class="dashboard-title">Cash</h1>
+    <div class="header-controls">
+      <span class="status-label">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusLabel">Caricamento…</span>
+      </span>
+      <button class="btn" id="refreshBtn" type="button">Aggiorna</button>
+      <button class="btn" id="themeToggle" type="button">Tema</button>
+    </div>
+  </div>
+  <p class="dashboard-subtitle" id="subtitle">Andamento mensile da Google Sheets</p>
+  <div class="error-banner" id="errorBanner"></div>
+
+  <p class="section-label">Mese corrente (effettivo)</p>
+  <div class="kpi-row">
+    <div class="stat-tile">
+      <span class="stat-label">Entrate</span>
+      <span class="stat-value" id="kpiIncome">—</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Uscite</span>
+      <span class="stat-value" id="kpiExpenses">—</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Saldo</span>
+      <span class="stat-value" id="kpiBalance">—</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Liquidità</span>
+      <span class="stat-value" id="kpiLiquidity">—</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Titoli</span>
+      <span class="stat-value" id="kpiSecurities">—</span>
+    </div>
+    <div class="stat-tile">
+      <span class="stat-label">Patrimonio</span>
+      <span class="stat-value" id="kpiWealth">—</span>
+    </div>
+  </div>
+
+  <div id="forecastKpiBlock" hidden>
+    <p class="section-label">Stima futura (stesse colonne del foglio)</p>
+    <div class="kpi-row">
+      <div class="stat-tile forecast">
+        <span class="stat-label">Entrate</span>
+        <span class="stat-value" id="fKpiIncome">—</span>
+        <span class="stat-hint" id="fKpiMonth">—</span>
+      </div>
+      <div class="stat-tile forecast">
+        <span class="stat-label">Uscite</span>
+        <span class="stat-value" id="fKpiExpenses">—</span>
+      </div>
+      <div class="stat-tile forecast">
+        <span class="stat-label">Saldo</span>
+        <span class="stat-value" id="fKpiBalance">—</span>
+      </div>
+      <div class="stat-tile forecast">
+        <span class="stat-label">Liquidità</span>
+        <span class="stat-value" id="fKpiLiquidity">—</span>
+      </div>
+      <div class="stat-tile forecast">
+        <span class="stat-label">Titoli</span>
+        <span class="stat-value" id="fKpiSecurities">—</span>
+      </div>
+      <div class="stat-tile forecast">
+        <span class="stat-label">Patrimonio</span>
+        <span class="stat-value" id="fKpiWealth">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Entrate e uscite</div>
+      <div class="chart-subtitle">Continuo = effettivo · tratteggiato = stima futura</div>
+      <div class="chart-canvas-wrap">
+        <canvas id="flowChart"></canvas>
+        <div class="chart-tooltip" id="flowTooltip"></div>
+      </div>
+      <div class="chart-legend">
+        <span class="legend-item">
+          <span class="legend-swatch" style="background: var(--series-1)"></span>
+          Entrate
+        </span>
+        <span class="legend-item">
+          <span class="legend-swatch" style="background: var(--series-2)"></span>
+          Uscite
+        </span>
+        <span class="legend-item">
+          <span class="legend-swatch dashed"></span>
+          Stima
+        </span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Patrimonio</div>
+      <div class="chart-subtitle">Liquidità e titoli · tratteggiato = stima futura</div>
+      <div class="chart-canvas-wrap">
+        <canvas id="wealthChart"></canvas>
+        <div class="chart-tooltip" id="wealthTooltip"></div>
+      </div>
+      <div class="chart-legend">
+        <span class="legend-item">
+          <span class="legend-swatch" style="background: var(--series-3)"></span>
+          Liquidità
+        </span>
+        <span class="legend-item">
+          <span class="legend-swatch" style="background: var(--series-4)"></span>
+          Titoli
+        </span>
+        <span class="legend-item">
+          <span class="legend-swatch dashed"></span>
+          Stima
+        </span>
+      </div>
+    </div>
+
+    <div class="chart-card">
+      <div class="chart-title">Dettaglio mensile</div>
+      <div class="chart-subtitle">Ultimi mesi effettivi e prossime stime</div>
+      <button class="table-toggle" id="tableToggle" type="button">Mostra tabella</button>
+      <table class="data-table" id="monthTable">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Mese</th>
+            <th>Entrate</th>
+            <th>Uscite</th>
+            <th>Saldo</th>
+            <th>Liquidità</th>
+            <th>Titoli</th>
+            <th>Patrimonio</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const euro = new Intl.NumberFormat("it-IT", {
+  style: "currency",
+  currency: "EUR",
+  maximumFractionDigits: 0,
+});
+
+let cashData = null;
+
+const themeBtn = document.getElementById("themeToggle");
+let currentTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+document.documentElement.setAttribute("data-theme", currentTheme);
+updateThemeButton();
+
+themeBtn.addEventListener("click", () => {
+  currentTheme = currentTheme === "dark" ? "light" : "dark";
+  document.documentElement.setAttribute("data-theme", currentTheme);
+  updateThemeButton();
+  if (cashData) renderCharts(cashData);
+});
+
+function updateThemeButton() {
+  themeBtn.textContent = currentTheme === "dark" ? "Chiaro" : "Scuro";
+}
+
+document.getElementById("tableToggle").addEventListener("click", () => {
+  const table = document.getElementById("monthTable");
+  const visible = table.classList.toggle("visible");
+  document.getElementById("tableToggle").textContent = visible ? "Nascondi tabella" : "Mostra tabella";
+});
+
+document.getElementById("refreshBtn").addEventListener("click", () => loadData(true));
+
+function formatEuro(value) {
+  return euro.format(value || 0);
+}
+
+function getResolvedColor(cssVar) {
+  if (cssVar.startsWith("var(")) {
+    const prop = cssVar.slice(4, -1);
+    return getComputedStyle(document.querySelector(".viz-root")).getPropertyValue(prop).trim();
+  }
+  return cssVar;
+}
+
+/** Visible window: last 36 actual months + next 60 forecast months */
+function chartWindow(data) {
+  const n = data.months.length;
+  const fs = data.forecast_start == null ? n : data.forecast_start;
+  const start = Math.max(0, fs - 36);
+  const end = Math.min(n, fs + 60);
+  const slice = (arr) => arr.slice(start, end);
+  return {
+    months: slice(data.months),
+    income: slice(data.income),
+    expenses: slice(data.expenses),
+    liquidity: slice(data.liquidity),
+    securities: slice(data.securities),
+    is_forecast: slice(data.is_forecast),
+    forecast_start: fs < start ? 0 : fs > end ? null : fs - start,
+  };
+}
+
+function drawLineChart(canvasId, labels, seriesData, seriesColors, tooltipId, seriesNames, forecastStart) {
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext("2d");
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const w = rect.width;
+  const h = rect.height;
+  const pad = { top: 16, right: 64, bottom: 40, left: 56 };
+  const plotW = w - pad.left - pad.right;
+  const plotH = h - pad.top - pad.bottom;
+  const n = labels.length;
+
+  const colors = seriesColors.map(getResolvedColor);
+  const gridColor = getResolvedColor("var(--gridline)");
+  const baselineColor = getResolvedColor("var(--baseline)");
+  const mutedColor = getResolvedColor("var(--text-muted)");
+  const surfaceColor = getResolvedColor("var(--surface-1)");
+
+  ctx.clearRect(0, 0, w, h);
+
+  let yMax = 0;
+  for (const s of seriesData) {
+    for (const v of s) if (v > yMax) yMax = v;
+  }
+  if (yMax === 0) yMax = 1000;
+  const nice = Math.pow(10, Math.floor(Math.log10(yMax)));
+  yMax = Math.ceil(yMax / nice) * nice;
+
+  const numTicks = 5;
+  ctx.strokeStyle = gridColor;
+  ctx.lineWidth = 1;
+  ctx.fillStyle = mutedColor;
+  ctx.font = '12px "Segoe UI", system-ui, sans-serif';
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i <= numTicks; i++) {
+    const y = pad.top + plotH - (i * plotH / numTicks);
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + plotW, y);
+    ctx.stroke();
+    ctx.fillText(formatEuro(i * yMax / numTicks), pad.left - 8, y);
+  }
+
+  ctx.strokeStyle = baselineColor;
+  ctx.beginPath();
+  ctx.moveTo(pad.left, pad.top + plotH);
+  ctx.lineTo(pad.left + plotW, pad.top + plotH);
+  ctx.stroke();
+
+  function xAt(i) {
+    return pad.left + (n === 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  }
+  function yAt(v) {
+    return pad.top + plotH - (v / yMax) * plotH;
+  }
+
+  // Forecast divider
+  if (forecastStart != null && forecastStart > 0 && forecastStart < n) {
+    const x = xAt(forecastStart);
+    ctx.save();
+    ctx.strokeStyle = mutedColor;
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x, pad.top);
+    ctx.lineTo(x, pad.top + plotH);
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = mutedColor;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = '11px "Segoe UI", system-ui, sans-serif';
+    ctx.fillText("stima →", x + 6, pad.top + 4);
+  }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  ctx.fillStyle = mutedColor;
+  ctx.font = '12px "Segoe UI", system-ui, sans-serif';
+  const tickCount = Math.min(6, n);
+  const step = Math.max(1, Math.floor((n - 1) / (tickCount - 1)));
+  for (let i = 0; i < n; i += step) {
+    ctx.fillText(labels[i].slice(0, 3) + " " + labels[i].slice(-2), xAt(i), pad.top + plotH + 10);
+  }
+
+  seriesData.forEach((data, si) => {
+    if (data.length < 1) return;
+    const color = colors[si];
+    const split = forecastStart == null ? data.length : forecastStart;
+
+    // Actual segment (solid)
+    const actualEnd = Math.min(split, data.length);
+    if (actualEnd > 0) {
+      ctx.beginPath();
+      ctx.moveTo(xAt(0), pad.top + plotH);
+      for (let i = 0; i < actualEnd; i++) ctx.lineTo(xAt(i), yAt(data[i]));
+      ctx.lineTo(xAt(actualEnd - 1), pad.top + plotH);
+      ctx.closePath();
+      ctx.fillStyle = color + "1a";
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.setLineDash([]);
+      for (let i = 0; i < actualEnd; i++) {
+        if (i === 0) ctx.moveTo(xAt(i), yAt(data[i]));
+        else ctx.lineTo(xAt(i), yAt(data[i]));
+      }
+      ctx.stroke();
+    }
+
+    // Forecast segment (dashed), connected from last actual point
+    if (split < data.length) {
+      const startIdx = Math.max(0, split - 1);
+      ctx.beginPath();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.setLineDash([6, 5]);
+      for (let i = startIdx; i < data.length; i++) {
+        if (i === startIdx) ctx.moveTo(xAt(i), yAt(data[i]));
+        else ctx.lineTo(xAt(i), yAt(data[i]));
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    const lastIdx = data.length - 1;
+    ctx.beginPath();
+    ctx.arc(xAt(lastIdx), yAt(data[lastIdx]), 6, 0, Math.PI * 2);
+    ctx.fillStyle = surfaceColor;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(xAt(lastIdx), yAt(data[lastIdx]), 4, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+
+  setupHover(canvas, tooltipId, labels, seriesData, colors, seriesNames, pad, plotW, plotH, forecastStart);
+}
+
+function setupHover(canvas, tooltipId, labels, seriesData, colors, seriesNames, pad, plotW, plotH, forecastStart) {
+  const tooltip = document.getElementById(tooltipId);
+  const wrap = canvas.parentElement;
+  const n = labels.length;
+
+  canvas.onmousemove = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    if (mx < pad.left || mx > pad.left + plotW || my < pad.top || my > pad.top + plotH || n === 0) {
+      tooltip.classList.remove("visible");
+      return;
+    }
+    const ratio = n === 1 ? 0 : (mx - pad.left) / plotW;
+    const idx = Math.min(n - 1, Math.max(0, Math.round(ratio * (n - 1))));
+    const kind = (forecastStart != null && idx >= forecastStart) ? " · stima" : "";
+
+    let html = `<div class="tooltip-time">${labels[idx]}${kind}</div>`;
+    seriesData.forEach((data, si) => {
+      html += `<div class="tooltip-row">
+        <span class="tooltip-key" style="background:${colors[si]}"></span>
+        <span class="tooltip-value">${formatEuro(data[idx])}</span>
+        <span class="tooltip-label">${seriesNames[si]}</span>
+      </div>`;
+    });
+    tooltip.innerHTML = html;
+
+    const tLeft = mx + 16;
+    tooltip.style.left = (tLeft + tooltip.offsetWidth > wrap.offsetWidth)
+      ? (mx - tooltip.offsetWidth - 16) + "px"
+      : tLeft + "px";
+    tooltip.style.top = (my - 16) + "px";
+    tooltip.classList.add("visible");
+  };
+
+  canvas.onmouseleave = () => tooltip.classList.remove("visible");
+}
+
+function fillKpi(prefix, snap) {
+  if (!snap) return;
+  document.getElementById(prefix + "Income").textContent = formatEuro(snap.income);
+  document.getElementById(prefix + "Expenses").textContent = formatEuro(snap.expenses);
+  const bal = document.getElementById(prefix + "Balance");
+  bal.textContent = formatEuro(snap.balance);
+  bal.className = "stat-value " + (snap.balance >= 0 ? "up" : "down");
+  document.getElementById(prefix + "Liquidity").textContent = formatEuro(snap.liquidity);
+  document.getElementById(prefix + "Securities").textContent = formatEuro(snap.securities);
+  document.getElementById(prefix + "Wealth").textContent = formatEuro(snap.wealth);
+}
+
+function renderKpis(data) {
+  fillKpi("kpi", data.latest);
+  const block = document.getElementById("forecastKpiBlock");
+  if (data.forecast_latest) {
+    block.hidden = false;
+    fillKpi("fKpi", data.forecast_latest);
+    document.getElementById("fKpiMonth").textContent = "Fine proiezione: " + data.forecast_latest.month;
+    const nForecast = data.is_forecast.filter(Boolean).length;
+    document.getElementById("subtitle").textContent =
+      `Effettivo: ${data.latest.month} · ${nForecast} mesi di stima fino a ${data.forecast_latest.month}`;
+  } else {
+    block.hidden = true;
+    document.getElementById("subtitle").textContent =
+      `Ultimo mese: ${data.latest.month} · Nessuna stima futura nel foglio`;
+  }
+}
+
+function renderTable(data) {
+  const tbody = document.querySelector("#monthTable tbody");
+  tbody.innerHTML = "";
+  const fs = data.forecast_start == null ? data.months.length : data.forecast_start;
+  const start = Math.max(0, fs - 6);
+  const end = Math.min(data.months.length, fs + 12);
+  for (let i = start; i < end; i++) {
+    const forecast = data.is_forecast[i];
+    const tr = document.createElement("tr");
+    if (forecast) tr.className = "forecast";
+    const cells = [
+      forecast ? "Stima" : "Effettivo",
+      data.months[i],
+      formatEuro(data.income[i]),
+      formatEuro(data.expenses[i]),
+      formatEuro(data.income[i] - data.expenses[i]),
+      formatEuro(data.liquidity[i]),
+      formatEuro(data.securities[i]),
+      formatEuro(data.liquidity[i] + data.securities[i]),
+    ];
+    cells.forEach((text) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+}
+
+function renderCharts(data) {
+  const w = chartWindow(data);
+  drawLineChart(
+    "flowChart",
+    w.months,
+    [w.income, w.expenses],
+    ["var(--series-1)", "var(--series-2)"],
+    "flowTooltip",
+    ["Entrate", "Uscite"],
+    w.forecast_start
+  );
+  drawLineChart(
+    "wealthChart",
+    w.months,
+    [w.liquidity, w.securities],
+    ["var(--series-3)", "var(--series-4)"],
+    "wealthTooltip",
+    ["Liquidità", "Titoli"],
+    w.forecast_start
+  );
+}
+
+function setStatus(ok, message) {
+  const dot = document.getElementById("statusDot");
+  const label = document.getElementById("statusLabel");
+  dot.classList.toggle("ok", ok);
+  label.textContent = message;
+}
+
+async function loadData(forceRefresh) {
+  const btn = document.getElementById("refreshBtn");
+  const banner = document.getElementById("errorBanner");
+  btn.disabled = true;
+  setStatus(false, "Caricamento…");
+  try {
+    const url = forceRefresh ? "/api/cash?refresh=true" : "/api/cash";
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    cashData = await res.json();
+    renderKpis(cashData);
+    renderCharts(cashData);
+    renderTable(cashData);
+    banner.classList.remove("visible");
+    const updated = cashData.updated_at
+      ? new Date(cashData.updated_at).toLocaleString("it-IT")
+      : "";
+    setStatus(true, updated ? `Aggiornato ${updated}` : "Connesso");
+  } catch (err) {
+    banner.textContent = "Impossibile caricare i dati: " + err.message;
+    banner.classList.add("visible");
+    setStatus(false, "Errore");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+window.addEventListener("resize", () => {
+  if (cashData) renderCharts(cashData);
+});
+
+loadData(false);
+</script>
+</body>
+</html>
