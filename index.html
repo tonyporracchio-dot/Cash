@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Liquidità</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+body { font-family: Arial; margin: 0; background: #0f172a; color: white; }
+.container { padding: 15px; }
+.cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+.card { background: #1e293b; padding: 15px; border-radius: 10px; }
+.card h3 { margin: 0; font-size: 14px; color: #94a3b8; }
+.card p { font-size: 20px; margin: 5px 0 0; }
+canvas { background: #1e293b; border-radius: 10px; margin-bottom: 20px; }
+.loader { position: fixed; inset: 0; background: #0f172a; display: flex; justify-content: center; align-items: center; }
+</style>
+</head>
+
+<body>
+
+<div class="loader" id="loader">Caricamento...</div>
+
+<div class="container">
+    <div class="cards">
+        <div class="card"><h3>Liquidità</h3><p id="liquidita"></p></div>
+        <div class="card"><h3>Entrate</h3><p id="entrate"></p></div>
+        <div class="card"><h3>Uscite</h3><p id="uscite"></p></div>
+        <div class="card"><h3>Patrimonio</h3><p id="patrimonio"></p></div>
+        <div class="card"><h3>Crescita media</h3><p id="crescita"></p></div>
+    </div>
+
+    <canvas id="liquiditaChart"></canvas>
+    <canvas id="entrateUsciteChart"></canvas>
+</div>
+
+<script>
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTSh-PJ8uff324g2SKnIxq4UnXCWVJjl-wer-CDciNP3xXHTFCdX_FIumP5NA2I8XpWqRXL2gHoMKTq/pub?gid=2116695106&output=csv";
+
+const mesiMap = {
+    gennaio:0,febbraio:1,marzo:2,aprile:3,maggio:4,giugno:5,
+    luglio:6,agosto:7,settembre:8,ottobre:9,novembre:10,dicembre:11
+};
+
+function parseNumber(val){
+    if(!val) return 0;
+    return parseFloat(
+        val.replace(/€/g,"")
+           .replace(/\s/g,"")
+           .replace(/\./g,"")
+           .replace(",",".")
+    ) || 0;
+}
+
+function parseMese(str){
+    const [m,a]=str.toLowerCase().split(" ");
+    return new Date(parseInt(a), mesiMap[m],1);
+}
+
+function isFuture(d){
+    const now=new Date();
+    return d>new Date(now.getFullYear(),now.getMonth(),1);
+}
+
+function crescitaMedia(arr){
+    let v=[];
+    for(let i=1;i<arr.length;i++) v.push(arr[i]-arr[i-1]);
+    return v.reduce((a,b)=>a+b,0)/v.length;
+}
+
+async function loadData(){
+    document.getElementById("loader").style.display="flex";
+
+    const text=await (await fetch(CSV_URL)).text();
+
+    // autodetect separatore
+    const sep = text.includes(";") ? ";" : ",";
+
+    const rows=text.trim().split("\n").map(r=>r.split(sep));
+
+    const headers=rows[0].map(h=>h.trim().toLowerCase());
+
+    const idx = {
+        mese: headers.indexOf("mese"),
+        entrate: headers.indexOf("totale entrate"),
+        uscite: headers.indexOf("totale uscite"),
+        liquidita: headers.indexOf("totale liquidità"),
+        titoli: headers.indexOf("titoli")
+    };
+
+    const mesi=[], entrate=[], uscite=[], liquidita=[], titoli=[], prev=[];
+
+    rows.slice(1).forEach(r=>{
+        if(!r[idx.mese]) return;
+
+        mesi.push(r[idx.mese]);
+        entrate.push(parseNumber(r[idx.entrate]));
+        uscite.push(parseNumber(r[idx.uscite]));
+        liquidita.push(parseNumber(r[idx.liquidita]));
+        titoli.push(parseNumber(r[idx.titoli]));
+
+        prev.push(isFuture(parseMese(r[idx.mese])));
+    });
+
+    const last=mesi.length-1;
+
+    document.getElementById("liquidita").innerText=format(liquidita[last]);
+    document.getElementById("entrate").innerText=format(entrate[last]);
+    document.getElementById("uscite").innerText=format(uscite[last]);
+    document.getElementById("patrimonio").innerText=format(liquidita[last]+titoli[last]);
+    document.getElementById("crescita").innerText=format(crescitaMedia(liquidita));
+
+    drawCharts(mesi, entrate, uscite, liquidita, prev);
+
+    document.getElementById("loader").style.display="none";
+}
+
+function format(n){
+    return n.toLocaleString("it-IT",{style:"currency",currency:"EUR"});
+}
+
+function drawCharts(mesi, entrate, uscite, liquidita, prev){
+
+    const storico=[], previsione=[];
+
+    for(let i=0;i<liquidita.length;i++){
+        if(prev[i]){
+            storico.push(null);
+            previsione.push(liquidita[i]);
+        } else {
+            storico.push(liquidita[i]);
+            previsione.push(null);
+        }
+    }
+
+    new Chart(document.getElementById("liquiditaChart"),{
+        type:"line",
+        data:{
+            labels:mesi,
+            datasets:[
+                {label:"Storico",data:storico},
+                {label:"Previsione",data:previsione,borderDash:[6,6]}
+            ]
+        }
+    });
+
+    new Chart(document.getElementById("entrateUsciteChart"),{
+        type:"bar",
+        data:{
+            labels:mesi,
+            datasets:[
+                {label:"Entrate",data:entrate},
+                {label:"Uscite",data:uscite}
+            ]
+        }
+    });
+}
+
+loadData();
+</script>
+
+</body>
+</html>
